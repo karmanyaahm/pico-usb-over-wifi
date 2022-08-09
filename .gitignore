@@ -1,0 +1,8 @@
+passwords.ini
+
+# platformio
+.pioenvs
+.piolibdeps
+.clang_complete
+.gcc-flags.json
+.pio
