@@ -13,6 +13,9 @@
         "*.tcc": "cpp",
         "random": "cpp",
         "functional": "cpp",
-        "ostream": "cpp"
+        "ostream": "cpp",
+        "tusb.h": "c",
+        "cdc_host.h": "c",
+        "usbh.h": "c"
     }
 }

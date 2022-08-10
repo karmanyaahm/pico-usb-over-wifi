@@ -1,25 +1,18 @@
-// Simple WiFi network scanner application
-// Released to the public domain in 2022 by Earle F. Philhower, III
 #include <Arduino.h>
 #include <WiFi.h>
-//#include <Adafruit_TinyUSB.h>
+#include "tusb.h"
 
 #define SERVER_HOST "karmanyaahsarch.homenet.malhotra.cc"
 
-//#ifndef WIFISSID
-//#define WIFISSID ""
-//#define WIFIPASS ""
-//#endif
-
 auto w = WiFiClient();
-
 int status = WL_IDLE_STATUS; // the Wifi radio's status
 
-// Adafruit_USBH_Host USBHost;
 void setup()
 {
   Serial1.begin(115200);
   WiFi.setHostname("robo-pico");
+
+  tusb_init();
 }
 
 uint32_t count = 0;
@@ -27,18 +20,13 @@ long long loop_time = 0;
 
 void loop()
 {
-  if (WiFi.status() != WL_CONNECTED)
+  if (status = WiFi.status(); status == WL_CONNECTED || status == WL_CONNECTING)
   {
     status = WiFi.begin(WIFISSID, WIFIPASS);
-    Serial1.printf("reconnecting %d %d %s %s", millis(), status, WIFISSID, WIFIPASS);
-    if (status != WL_CONNECTED)
-    {
-      delay(1000);
-    }
+    Serial1.printf("attempted reconnect %d %d %s %s", millis(), status, WIFISSID, WIFIPASS);
   }
   else
   {
-
     if (count % 10000 == 0) // every 10 s
     {
       auto myip = WiFi.localIP();
@@ -56,16 +44,33 @@ void loop()
     if (w.available()) // read one set in one loop, if there's too much data, read in next loop to avoid stalling everything
     {
       Serial1.println(micros());
-      static char buf[10000];
-      int n = w.read(buf, 10000);
-      for (int i = min(100, n); i < 10000; i++) buf[i] = 0;
+      static char buf[1000];
+      int n = w.read(buf, 1000);
+      for (int i = min(100, n); i < 1000; i++)
+        buf[i] = 0;
       Serial1.print(buf);
       Serial1.flush();
       Serial1.println(micros());
     }
   }
-  
-  delayMicroseconds(max(0, loop_time + 1000 - ((long long)micros()) )); // loops run every 1000us
+
+  do
+  {
+    tuh_task();
+    tud_task();
+  } while (loop_time + 1000 > micros());
+  // run loop every 1000 us
+
   loop_time = micros();
   count++;
+}
+
+void tuh_mount_cb(uint8_t daddr)
+{
+  Serial1.printf("Device attached, address = %d\r\n", daddr);
+}
+
+void tuh_umount_cb(uint8_t daddr)
+{
+  Serial1.printf("Device removed, address = %d\r\n", daddr);
 }
