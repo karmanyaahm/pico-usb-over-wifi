@@ -36,11 +36,11 @@ extern int serial1_printf(const char *__restrict __format, ...);
 // Device Configuration
 
 // Don't want this, but need this to prevent SerialUSB errors
-#define CFG_TUSB_RHPORT1_MODE OPT_MODE_DEVICE
-#define CFG_TUD_CDC 1
-
-#define CFG_TUD_CDC_RX_BUFSIZE 256
-#define CFG_TUD_CDC_TX_BUFSIZE 256
+//#define CFG_TUSB_RHPORT1_MODE OPT_MODE_DEVICE
+//#define CFG_TUD_CDC 1
+//
+//#define CFG_TUD_CDC_RX_BUFSIZE 256
+//#define CFG_TUD_CDC_TX_BUFSIZE 256
 
 //--------------------------------------------------------------------
 // Host Configuration

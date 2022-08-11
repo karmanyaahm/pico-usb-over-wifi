@@ -10,11 +10,12 @@ int status = WL_IDLE_STATUS; // the Wifi radio's status
 void setup()
 {
   Serial1.begin(115200);
+  delay(1);
   Serial1.println("hiiiiii");
   WiFi.setHostname("robo-pico");
 
   Serial1.println("Initializing tusb");
-  tusb_init();
+  tuh_init(0);
   Serial1.println("HII, setup finished");
 }
 
@@ -23,17 +24,18 @@ long long loop_time = 0;
 
 void loop()
 {
-  if (status = WiFi.status(); status == WL_CONNECTED || status == WL_CONNECTING)
+  status = WiFi.status();
+  if (status != WL_CONNECTED)
   {
     status = WiFi.begin(WIFISSID, WIFIPASS);
-    Serial1.printf("attempted reconnect %d %d %s %s", millis(), status, WIFISSID, WIFIPASS);
+    Serial1.printf("attempted reconnect %d %d %s %s %d\n", millis(), status, WIFISSID, WIFIPASS, tuh_inited());
   }
   else
   {
-    if (count % 10000 == 0) // every 10 s
+    if (count % 1000 == 0) // every 10 s
     {
       auto myip = WiFi.localIP();
-      Serial1.printf("--- Status: %d %s %d %d\n", status, myip.toString().c_str(), millis(), count);
+      Serial1.printf("--- Status: %d %s time: %d count: %d tuh_mounted: %d %d %d %d\n", status, myip.toString().c_str(), millis(), count, tuh_mounted(1), tuh_mounted(2), tuh_mounted(3), tuh_mounted(4));
     }
 
     if (!w.connected() && count % 100 == 0) // attempt every 100 ms
@@ -60,7 +62,6 @@ void loop()
   do
   {
     tuh_task();
-    tud_task();
   } while (loop_time + 1000 > micros());
   // run loop every 1000 us
 
@@ -68,29 +69,29 @@ void loop()
   count++;
 }
 
-//CFG_TUSB_MEM_SECTION static char serial_in_buffer[64] = { 0 };
+CFG_TUSB_MEM_SECTION static char serial_in_buffer[64] = {0};
 
 void tuh_mount_cb(uint8_t daddr)
 {
-  //Serial1.printf("Device attached, address = %d\r\n", daddr);
-    //tuh_cdc_receive(daddr, serial_in_buffer, sizeof(serial_in_buffer), true); // schedule first transfer
-
+  Serial1.printf("Device attached, address = %d\n", daddr);
+  tuh_cdc_receive(daddr, serial_in_buffer, sizeof(serial_in_buffer), true); // schedule first transfer
 }
 
 void tuh_umount_cb(uint8_t daddr)
 {
-  //Serial1.printf("Device removed, address = %d\r\n", daddr);
+  Serial1.printf("Device removed, address = %d\n", daddr);
 }
 
 // invoked ISR context
 void tuh_cdc_xfer_isr(uint8_t dev_addr, xfer_result_t event, cdc_pipeid_t pipe_id, uint32_t xferred_bytes)
 {
- // (void) event;
- // (void) pipe_id;
- // (void) xferred_bytes;
+  Serial1.printf("xfer %d\n", dev_addr);
+  (void)event;
+  (void)pipe_id;
+  (void)xferred_bytes;
 
- // printf(serial_in_buffer);
- // tu_memclr(serial_in_buffer, sizeof(serial_in_buffer));
+  Serial1.printf(serial_in_buffer);
+  tu_memclr(serial_in_buffer, sizeof(serial_in_buffer));
 
- // tuh_cdc_receive(dev_addr, serial_in_buffer, sizeof(serial_in_buffer), true); // waiting for next data
+  tuh_cdc_receive(dev_addr, serial_in_buffer, sizeof(serial_in_buffer), true); // waiting for next data
 }
