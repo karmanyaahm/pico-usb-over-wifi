@@ -16,6 +16,12 @@
         "ostream": "cpp",
         "tusb.h": "c",
         "cdc_host.h": "c",
-        "usbh.h": "c"
+        "usbh.h": "c",
+        "exception": "cpp",
+        "memory_resource": "cpp",
+        "iosfwd": "cpp",
+        "new": "cpp",
+        "streambuf": "cpp",
+        "cyw43_spi.h": "c"
     }
 }

@@ -1,4 +1,3 @@
-#include "custom_tusb_config.h"
 //#include <SerialUART.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -9,18 +8,10 @@
 #include "pio_usb.h"
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
-#include "pico/bootrom.h"
 
-#include "cyw43_ll.h"
-
-
-
-#include "lwip/pbuf.h"
-#include "lwip/tcp.h"
-//#include <WiFi.h>
-//#include <WiFiClient.h>
-
-#include "pico/cyw43_arch.h"
+#include <Arduino.h>
+#include <WiFi.h>
+#include <WiFiClient.h>
 
 // English
 #define LANGUAGE_ID 0x0409
@@ -28,7 +19,10 @@
 
 tusb_desc_device_t desc_device;
 #define HOST "karmanyaahsarch.homenet.malhotra.cc"
-//WiFiClient client = WiFiClient();
+WiFiClient client = WiFiClient();
+
+queue_t q1_bc;
+queue_t q1_cb;
 
 //--------------------------------------------------------------------+
 // MACRO CONSTANT TYPEDEF PROTYPES
@@ -55,15 +49,23 @@ void setup1()
   Serial1.begin(115200);
   Serial1.printf("TinyUSB Bare API Example\r\n");
 
+  queue_init(&q1_bc, 1, 10000);
+  queue_init(&q1_cb, 1, 10000);
   sleep_ms(10);
 
   pio_usb_configuration_t pio_cfg = PIO_USB_DEFAULT_CONFIG;
-  pio_cfg.pin_dp = 27;
-  //pio_cfg.alarm_pool = alarm_pool_create(1, 1);
-  //tuh_configure(1, TUH_CFGID_RPI_PIO_USB_CONFIGURATION, &pio_cfg);
+  pio_cfg.pin_dp = 3;
+  pio_cfg.sm_tx = 3;
+  pio_cfg.sm_rx = 2;
+  pio_cfg.sm_eop = 3;
+  pio_cfg.pio_rx_num = 0;
+  pio_cfg.pio_tx_num = 1;
+  pio_cfg.tx_ch = 9;
+
+  tuh_configure(1, TUH_CFGID_RPI_PIO_USB_CONFIGURATION, &pio_cfg);
 
   // init host stack on configured roothub port
-  //tuh_init(1); // TODO, run this line in core 1
+  tuh_init(1); // TODO, run this line in core 1
 
   while (1)
   {
@@ -88,63 +90,59 @@ void setup()
   sleep_ms(2000);
 
   Serial1.printf("Setting up wifi...0\n");
-  //already called by arduino stuffs, maybe double call is causing stucking????
-  //if (cyw43_arch_init())
+  // already called by arduino stuffs, maybe double call is causing stucking????
+  // if (cyw43_arch_init())
   //{
-  //  Serial1.printf("failed to initialize wifi\n");
-  //  return ;
-  //}
+  //   Serial1.printf("failed to initialize wifi\n");
+  //   return ;
+  // }
 
   Serial1.printf("Setting up wifi...\n");
-  cyw43_arch_enable_sta_mode();
-  Serial1.printf("Setting up wifi...2\n");
-
-  // WiFi.setHostname("robo-pico");
-  int status = 1; // WiFi.begin(WIFISSID, WIFIPASS);
-  if (auto ans = cyw43_arch_wifi_connect_timeout_ms(WIFISSID, WIFIPASS, CYW43_AUTH_WPA2_AES_PSK, 30000); ans)
-  {
-    Serial1.printf("failed to connect. %d\n", ans);
-    return;
-  }
-  else
-  {
-    Serial1.printf("Connected. %d\n", ans);
-  }
+  // cyw43_arch_enable_sta_mode();
+  WiFi.setHostname("robo-pico");
+  client.keepAlive(5, 3, 2);
+  // client.setDefaultNoDelay(true);
+  int status = WiFi.begin(WIFISSID, WIFIPASS);
   Serial1.printf("Wifi status %d\n", status);
 
   while (1)
   {
-    cyw43_arch_poll();
-    if (count1 % (int)2e4 == 0 )//&& !client.connected())
-      Serial1.printf("retrying connect TCP status: %d\n", 0);//client.connect(HOST, 10001));
+    // cyw43_arch_poll();
+    char ch;
+    int count = 0; // read many chars, but only 512 in one loop
+    while (queue_try_remove(&q1_bc, &ch) && count < 512)
+    {
+      client.write(ch);
+      count++;
+    }
+    count = 0;
+    int chh = client.read();
+    while (chh > 0 && count < 512)
+    {
+      Serial1.printf(queue_try_add(&q1_cb, &chh) ? "" : "q1_cb cannot add\n");
+      chh = client.read();
+      count++;
+    }
+    client.flush(20);
+
+    if (count1 % (int)1e4 == 0 && !client.connected())
+      Serial1.printf("retrying connect TCP status: %d\n", client.connect(HOST, 10001));
     sleep_ms(1);
     count1++;
   }
 }
-void loop()
-{
-}
+void loop(){};
 
 // invoked ISR context
 void tuh_cdc_xfer_isr(uint8_t dev_addr, xfer_result_t event, cdc_pipeid_t pipe_id, uint32_t xferred_bytes)
 {
-  (void)event;
-  (void)pipe_id;
-  (void)xferred_bytes;
-
-  // Serial1.printf("cdc_receive: addr: %d\n", dev_addr);
-  //  Serial1.printf("%s", serial_in_buffer);
 
   // for (int i = 0; i < xferred_bytes; i++)
   //   Serial1.printf("%c", serial_in_buffer[i]);
-  int status = -1; // client.write(serial_in_buffer, xferred_bytes);
-  Serial1.printf("BRAIN->COMPUTER TCP STATUS: %d len: %d\n", status, xferred_bytes);
-  //client.flush(); // TODO: timeout to not stall USB logic????
 
-  // Serial1.println();
-  // for (int i = 0; i < xferred_bytes; i++)
-  //  Serial1.printf("%02x", serial_in_buffer[i]);
-  //  Serial1.println();
+  for (int i = 0; i < xferred_bytes; i++)
+    Serial1.printf(queue_try_add(&q1_bc, &(serial_in_buffer[i])) ? "" : "q1_bc cannot add\n");
+
 
   tu_memclr(serial_in_buffer, sizeof(serial_in_buffer));
 
@@ -157,9 +155,16 @@ void cdc_task(void)
   tuh_cdc_receive(1, serial_in_buffer, sizeof(serial_in_buffer), true);
 
   // reading bytes 1 by 1 for now, but TODO read a bunch at once
-  int ch = Serial1.read(); // client.read();
-  if (ch >= 0)
+  // int ch = client.read();
+  // if (ch < 0)
+  //  ch = Serial1.read();
+  char ch;
+  if (queue_try_remove(&q1_cb, &ch))
+  {
+
+    Serial1.printf("COMPUTER->BRAIN received char: %02x\n", ch);
     tuh_cdc_send(1, &ch, 1, false);
+  }
 }
 
 /*------------- TinyUSB Callbacks -------------*/
